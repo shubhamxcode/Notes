@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromRequest, hashPassword } from '@/lib/auth'
 
-// GET /api/users - List all users in the admin's tenant
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
@@ -43,7 +42,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/users - Invite/create a new user in the admin's tenant
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
@@ -64,7 +62,6 @@ export async function POST(request: NextRequest) {
 
     const { email, role = 'member', password = 'password' } = await request.json()
 
-    // Validate required fields
     if (!email) {
       return NextResponse.json(
         { error: 'Email is required' },
@@ -72,7 +69,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate role
     if (!['admin', 'member'].includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role. Must be "admin" or "member"' },
@@ -80,7 +76,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email }
     })
@@ -92,10 +87,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash the password
     const hashedPassword = await hashPassword(password)
 
-    // Create the new user
     const newUser = await prisma.user.create({
       data: {
         email,

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 
-// GET /api/upgrade-invitations - Get upgrade invitations for the current user
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
@@ -14,11 +13,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Simulate upgrade invitations for demo purposes
-    // In production, this would query the actual UpgradeInvitation table
     const mockInvitations = []
     
-    // Check if user is on a free plan and show a mock invitation
     const tenant = await prisma.tenant.findUnique({
       where: { id: user.tenantId }
     })
@@ -43,7 +39,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/upgrade-invitations - Respond to an upgrade invitation
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
@@ -65,15 +60,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'accept') {
-      // If user accepts, trigger the upgrade process
       if (user.role !== 'admin') {
         return NextResponse.json(
-          { error: 'Only admins can upgrade subscriptions. Please contact your admin.' },
+          { error: 'Only admins can upgrade subscriptions. Please contact your admin to complete the upgrade.' },
           { status: 403 }
         )
       }
 
-      // Upgrade the tenant
       const tenant = await prisma.tenant.update({
         where: { id: user.tenantId },
         data: { subscription: 'pro' }
@@ -89,7 +82,6 @@ export async function POST(request: NextRequest) {
         }
       })
     } else {
-      // User declined the invitation
       return NextResponse.json({
         message: 'Upgrade invitation declined'
       })

@@ -26,7 +26,6 @@ export async function POST(
     const { id: targetUserId } = await params
     const { message = 'The admin has invited you to consider upgrading to Pro for unlimited notes!' } = await request.json()
 
-    // Check if target user exists and belongs to the same tenant
     const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
       include: { tenant: true }
@@ -46,10 +45,6 @@ export async function POST(
       )
     }
 
-    // For demo purposes, simulate sending the invitation
-    // In a real app, this would store the invitation in the database
-    // and potentially send email notifications
-    
     return NextResponse.json({
       message: 'Upgrade invitation sent successfully',
       invitation: {

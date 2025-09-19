@@ -36,29 +36,15 @@ export default function DashboardPage() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [editNote, setEditNote] = useState({ title: '', content: '' })
   
-  // User invitation states
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [showUsersList, setShowUsersList] = useState(false)
   const [newUser, setNewUser] = useState({ email: '', role: 'member' as 'admin' | 'member', password: 'password' })
   const [inviting, setInviting] = useState(false)
 
-  // Upgrade invitation states
   const [showUpgradeInviteForm, setShowUpgradeInviteForm] = useState(false)
   const [selectedUserForUpgrade, setSelectedUserForUpgrade] = useState<string>('')
   const [upgradeMessage, setUpgradeMessage] = useState('Your admin suggests upgrading to Pro for unlimited notes!')
   const [sendingUpgradeInvite, setSendingUpgradeInvite] = useState(false)
-
-  useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-    fetchNotes()
-    fetchUpgradeInvitations()
-    if (user.role === 'admin') {
-      fetchUsers()
-    }
-  }, [user, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -135,7 +121,6 @@ export default function DashboardPage() {
         setSelectedUserForUpgrade('')
         setUpgradeMessage('Your admin suggests upgrading to Pro for unlimited notes!')
         setError('')
-        // Show success message
         const data = await response.json()
         alert(`Upgrade invitation sent to ${data.invitation.targetUser}`)
       } else {
@@ -163,7 +148,7 @@ export default function DashboardPage() {
       if (response.ok) {
         await fetchUpgradeInvitations()
         if (action === 'accept') {
-          location.reload() // Refresh to show updated subscription status
+          location.reload()
         }
       } else {
         const errorData = await response.json()
@@ -346,6 +331,18 @@ export default function DashboardPage() {
     }
   }
 
+  useEffect(() => {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    fetchNotes()
+    fetchUpgradeInvitations()
+    if (user.role === 'admin') {
+      fetchUsers()
+    }
+  }, [user, router, fetchNotes, fetchUpgradeInvitations, fetchUsers])
+
   if (!user || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -380,7 +377,6 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {/* Upgrade Invitations Section */}
           {upgradeInvitations.length > 0 && (
             <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mb-6">
               <h3 className="text-sm font-medium text-purple-800 mb-3">Upgrade Invitations</h3>
@@ -433,7 +429,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Admin User Management Section */}
           {user.role === 'admin' && (
             <div className="bg-white shadow rounded-lg mb-6">
               <div className="px-4 py-5 sm:p-6">

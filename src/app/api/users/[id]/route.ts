@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 
-// PUT /api/users/[id] - Update user role
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,7 +26,6 @@ export async function PUT(
     const { id } = await params
     const { role } = await request.json()
 
-    // Validate role
     if (!role || !['admin', 'member'].includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role. Must be "admin" or "member"' },
@@ -35,7 +33,6 @@ export async function PUT(
       )
     }
 
-    // Check if target user exists and belongs to the same tenant
     const targetUser = await prisma.user.findUnique({
       where: { id }
     })
@@ -54,7 +51,6 @@ export async function PUT(
       )
     }
 
-    // Prevent admins from changing their own role
     if (targetUser.id === user.userId) {
       return NextResponse.json(
         { error: 'You cannot change your own role' },
@@ -62,7 +58,6 @@ export async function PUT(
       )
     }
 
-    // Update the user
     const updatedUser = await prisma.user.update({
       where: { id },
       data: { role },
@@ -87,7 +82,6 @@ export async function PUT(
   }
 }
 
-// DELETE /api/users/[id] - Delete user
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -111,7 +105,6 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if target user exists and belongs to the same tenant
     const targetUser = await prisma.user.findUnique({
       where: { id }
     })
@@ -130,7 +123,6 @@ export async function DELETE(
       )
     }
 
-    // Prevent admins from deleting themselves
     if (targetUser.id === user.userId) {
       return NextResponse.json(
         { error: 'You cannot delete yourself' },
@@ -138,7 +130,6 @@ export async function DELETE(
       )
     }
 
-    // Delete the user (notes will be cascade deleted due to schema)
     await prisma.user.delete({
       where: { id }
     })
