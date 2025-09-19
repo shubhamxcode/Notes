@@ -55,7 +55,7 @@ export async function PUT(
     }
 
     // Prevent admins from changing their own role
-    if (targetUser.id === user.id) {
+    if (targetUser.id === user.userId) {
       return NextResponse.json(
         { error: 'You cannot change your own role' },
         { status: 400 }
@@ -131,7 +131,7 @@ export async function DELETE(
     }
 
     // Prevent admins from deleting themselves
-    if (targetUser.id === user.id) {
+    if (targetUser.id === user.userId) {
       return NextResponse.json(
         { error: 'You cannot delete yourself' },
         { status: 400 }

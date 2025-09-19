@@ -21,7 +21,13 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export async function createToken(payload: JWTPayload): Promise<string> {
-  return new SignJWT(payload)
+  return new SignJWT({
+    userId: payload.userId,
+    email: payload.email,
+    role: payload.role,
+    tenantId: payload.tenantId,
+    tenantSlug: payload.tenantSlug
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
@@ -31,8 +37,14 @@ export async function createToken(payload: JWTPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret)
-    return payload as JWTPayload
-  } catch (error) {
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      role: payload.role as string,
+      tenantId: payload.tenantId as string,
+      tenantSlug: payload.tenantSlug as string
+    }
+  } catch {
     return null
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Note } from '@/types'
@@ -25,9 +25,9 @@ export default function DashboardPage() {
       return
     }
     fetchNotes()
-  }, [user, router])
+  }, [user, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       const response = await fetch('/api/notes', {
         headers: {
@@ -44,7 +44,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   const createNote = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,7 +69,7 @@ export default function DashboardPage() {
         const errorData = await response.json()
         setError(errorData.error)
       }
-    } catch (error) {
+    } catch {
       setError('Failed to create note')
     } finally {
       setCreating(false)
@@ -131,7 +131,7 @@ export default function DashboardPage() {
         const errorData = await response.json()
         setError(errorData.error)
       }
-    } catch (error) {
+    } catch {
       setError('Failed to update note')
     } finally {
       setCreating(false)
@@ -156,7 +156,7 @@ export default function DashboardPage() {
         const errorData = await response.json()
         setError(errorData.error)
       }
-    } catch (error) {
+    } catch {
       setError('Failed to upgrade subscription')
     } finally {
       setUpgrading(false)
@@ -203,7 +203,7 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="text-sm font-medium text-yellow-800">Free Plan Active</h3>
                   <p className="text-sm text-yellow-700">
-                    You're on the free plan (limited to 3 notes). Upgrade to Pro for unlimited notes.
+                    You&apos;re on the free plan (limited to 3 notes). Upgrade to Pro for unlimited notes.
                   </p>
                 </div>
                 <button
@@ -242,7 +242,7 @@ export default function DashboardPage() {
               {isAtLimit && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
                   <p className="text-sm text-red-600">
-                    You've reached the 3-note limit for free accounts. Upgrade to Pro to create more notes.
+                    You&apos;ve reached the 3-note limit for free accounts. Upgrade to Pro to create more notes.
                   </p>
                 </div>
               )}
