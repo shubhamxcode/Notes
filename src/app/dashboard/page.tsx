@@ -5,10 +5,27 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Note } from '@/types'
 
+interface User {
+  id: string
+  email: string
+  role: 'admin' | 'member'
+  createdAt: string
+}
+
+interface UpgradeInvitation {
+  id: string
+  message: string
+  fromUser: { email: string }
+  createdAt: string
+  status: string
+}
+
 export default function DashboardPage() {
   const { user, logout, token } = useAuth()
   const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [upgradeInvitations, setUpgradeInvitations] = useState<UpgradeInvitation[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newNote, setNewNote] = useState({ title: '', content: '' })
@@ -18,6 +35,18 @@ export default function DashboardPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [editNote, setEditNote] = useState({ title: '', content: '' })
+  
+  // User invitation states
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [showUsersList, setShowUsersList] = useState(false)
+  const [newUser, setNewUser] = useState({ email: '', role: 'member' as 'admin' | 'member', password: 'password' })
+  const [inviting, setInviting] = useState(false)
+
+  // Upgrade invitation states
+  const [showUpgradeInviteForm, setShowUpgradeInviteForm] = useState(false)
+  const [selectedUserForUpgrade, setSelectedUserForUpgrade] = useState<string>('')
+  const [upgradeMessage, setUpgradeMessage] = useState('Your admin suggests upgrading to Pro for unlimited notes!')
+  const [sendingUpgradeInvite, setSendingUpgradeInvite] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -25,6 +54,10 @@ export default function DashboardPage() {
       return
     }
     fetchNotes()
+    fetchUpgradeInvitations()
+    if (user.role === 'admin') {
+      fetchUsers()
+    }
   }, [user, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchNotes = useCallback(async () => {
@@ -45,6 +78,101 @@ export default function DashboardPage() {
       setLoading(false)
     }
   }, [token])
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users)
+      }
+    } catch (error) {
+      console.error('Fetch users error:', error)
+    }
+  }, [token])
+
+  const fetchUpgradeInvitations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/upgrade-invitations', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUpgradeInvitations(data.invitations)
+      }
+    } catch (error) {
+      console.error('Fetch upgrade invitations error:', error)
+    }
+  }, [token])
+
+  const sendUpgradeInvitation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUserForUpgrade) return
+
+    setSendingUpgradeInvite(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/users/${selectedUserForUpgrade}/invite-upgrade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: upgradeMessage })
+      })
+
+      if (response.ok) {
+        setShowUpgradeInviteForm(false)
+        setSelectedUserForUpgrade('')
+        setUpgradeMessage('Your admin suggests upgrading to Pro for unlimited notes!')
+        setError('')
+        // Show success message
+        const data = await response.json()
+        alert(`Upgrade invitation sent to ${data.invitation.targetUser}`)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error)
+      }
+    } catch {
+      setError('Failed to send upgrade invitation')
+    } finally {
+      setSendingUpgradeInvite(false)
+    }
+  }
+
+  const respondToUpgradeInvitation = async (invitationId: string, action: 'accept' | 'decline') => {
+    try {
+      const response = await fetch('/api/upgrade-invitations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ invitationId, action })
+      })
+
+      if (response.ok) {
+        await fetchUpgradeInvitations()
+        if (action === 'accept') {
+          location.reload() // Refresh to show updated subscription status
+        }
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error)
+      }
+    } catch {
+      setError('Failed to respond to upgrade invitation')
+    }
+  }
 
   const createNote = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,6 +226,8 @@ export default function DashboardPage() {
     setEditNote({ title: note.title, content: note.content })
     setShowEditForm(true)
     setShowCreateForm(false)
+    setShowInviteForm(false)
+    setShowUpgradeInviteForm(false)
   }
 
   const cancelEdit = () => {
@@ -135,6 +265,59 @@ export default function DashboardPage() {
       setError('Failed to update note')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const inviteUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setInviting(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newUser)
+      })
+
+      if (response.ok) {
+        await fetchUsers()
+        setNewUser({ email: '', role: 'member', password: 'password' })
+        setShowInviteForm(false)
+        setError('')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error)
+      }
+    } catch {
+      setError('Failed to invite user')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        await fetchUsers()
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error)
+      }
+    } catch {
+      setError('Failed to delete user')
     }
   }
 
@@ -197,13 +380,40 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Upgrade Invitations Section */}
+          {upgradeInvitations.length > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mb-6">
+              <h3 className="text-sm font-medium text-purple-800 mb-3">Upgrade Invitations</h3>
+              {upgradeInvitations.map((invitation) => (
+                <div key={invitation.id} className="bg-white p-3 rounded border border-purple-200 mb-2">
+                  <p className="text-sm text-gray-700 mb-2">{invitation.message}</p>
+                  <p className="text-xs text-gray-500 mb-3">From: {invitation.fromUser.email}</p>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => respondToUpgradeInvitation(invitation.id, 'accept')}
+                      className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 text-sm"
+                    >
+                      Accept Upgrade
+                    </button>
+                    <button
+                      onClick={() => respondToUpgradeInvitation(invitation.id, 'decline')}
+                      className="bg-gray-600 text-white px-3 py-1 rounded-md hover:bg-gray-700 text-sm"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {user.tenant.subscription === 'free' && user.role === 'admin' && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-medium text-yellow-800">Free Plan Active</h3>
                   <p className="text-sm text-yellow-700">
-                    You&apos;re on the free plan (limited to 3 notes). Upgrade to Pro for unlimited notes.
+                    You&apos;re on the free plan (limited to 3 notes per user). Upgrade to Pro for unlimited notes.
                   </p>
                 </div>
                 <button
@@ -223,6 +433,190 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Admin User Management Section */}
+          {user.role === 'admin' && (
+            <div className="bg-white shadow rounded-lg mb-6">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    User Management ({users.length} users)
+                  </h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setShowUsersList(!showUsersList)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                      {showUsersList ? 'Hide Users' : 'View Users'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowUpgradeInviteForm(!showUpgradeInviteForm)
+                        setShowInviteForm(false)
+                        setShowCreateForm(false)
+                        setShowEditForm(false)
+                      }}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                    >
+                      {showUpgradeInviteForm ? 'Cancel' : 'Invite to Upgrade'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowInviteForm(!showInviteForm)
+                        setShowCreateForm(false)
+                        setShowEditForm(false)
+                        setShowUpgradeInviteForm(false)
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                    >
+                      {showInviteForm ? 'Cancel' : 'Invite User'}
+                    </button>
+                  </div>
+                </div>
+
+                {showUpgradeInviteForm && (
+                  <form onSubmit={sendUpgradeInvitation} className="mb-6 p-4 border border-purple-200 bg-purple-50 rounded-lg">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Invite User to Upgrade</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Select User</label>
+                        <select
+                          value={selectedUserForUpgrade}
+                          onChange={(e) => setSelectedUserForUpgrade(e.target.value)}
+                          required
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="">Choose a user...</option>
+                          {users.filter(u => u.id !== user.id).map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.email} ({u.role})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Invitation Message</label>
+                        <textarea
+                          rows={3}
+                          value={upgradeMessage}
+                          onChange={(e) => setUpgradeMessage(e.target.value)}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                          placeholder="Your upgrade invitation message..."
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          type="submit"
+                          disabled={sendingUpgradeInvite || !selectedUserForUpgrade}
+                          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          {sendingUpgradeInvite ? 'Sending...' : 'Send Invitation'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowUpgradeInviteForm(false)}
+                          className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {showInviteForm && (
+                  <form onSubmit={inviteUser} className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Invite New User</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={newUser.email}
+                          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          placeholder="Enter user email"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Role</label>
+                        <select
+                          value={newUser.role}
+                          onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'member' })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        >
+                          <option value="member">Member</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Temporary Password</label>
+                        <input
+                          type="text"
+                          value={newUser.password}
+                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          placeholder="Temporary password for the user"
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          type="submit"
+                          disabled={inviting}
+                          className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {inviting ? 'Inviting...' : 'Send Invitation'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowInviteForm(false)}
+                          className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {showUsersList && (
+                  <div className="space-y-2">
+                    <h4 className="text-md font-medium text-gray-900">Current Users</h4>
+                    {users.length === 0 ? (
+                      <p className="text-gray-500">No users found.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {users.map((u) => (
+                          <div key={u.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-md bg-gray-50">
+                            <div>
+                              <span className="font-medium">{u.email}</span>
+                              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                                u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {u.role}
+                              </span>
+                              <span className="ml-2 text-sm text-gray-500">
+                                Joined {new Date(u.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {u.id !== user.id && (
+                              <button
+                                onClick={() => deleteUser(u.id)}
+                                className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 text-sm"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white shadow rounded-lg mb-6">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex justify-between items-center mb-4">
@@ -231,7 +625,12 @@ export default function DashboardPage() {
                 </h3>
                 {canCreateNote && (
                   <button
-                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    onClick={() => {
+                      setShowCreateForm(!showCreateForm)
+                      setShowInviteForm(false)
+                      setShowEditForm(false)
+                      setShowUpgradeInviteForm(false)
+                    }}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
                   >
                     {showCreateForm ? 'Cancel' : 'Create Note'}

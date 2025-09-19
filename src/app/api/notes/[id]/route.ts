@@ -18,10 +18,12 @@ export async function GET(
 
     const { id } = await params
 
+    // SECURITY FIX: Filter by tenantId AND userId - users can only access their own notes
     const note = await prisma.note.findFirst({
       where: {
         id,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        userId: user.userId  // Critical: Only allow access to user's own notes
       },
       include: {
         user: {
@@ -72,10 +74,12 @@ export async function PUT(
 
     const { id } = await params
 
+    // SECURITY FIX: Users can only update their own notes
     const existingNote = await prisma.note.findFirst({
       where: {
         id,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        userId: user.userId  // Critical: Only allow updating user's own notes
       }
     })
 
@@ -122,10 +126,12 @@ export async function DELETE(
 
     const { id } = await params
 
+    // SECURITY FIX: Users can only delete their own notes
     const existingNote = await prisma.note.findFirst({
       where: {
         id,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        userId: user.userId  // Critical: Only allow deleting user's own notes
       }
     })
 

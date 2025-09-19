@@ -13,8 +13,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // SECURITY FIX: Filter by both tenantId AND userId for proper isolation
+    // Users can only see their own notes, not other users' notes in the tenant
     const notes = await prisma.note.findMany({
-      where: { tenantId: user.tenantId },
+      where: { 
+        tenantId: user.tenantId,
+        userId: user.userId  // Critical: Only show notes created by current user
+      },
       include: {
         user: {
           select: { email: true }
@@ -53,9 +58,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // SECURITY FIX: Count only current user's notes for subscription limits
+    const userNotesCount = await prisma.note.count({
+      where: { 
+        tenantId: user.tenantId,
+        userId: user.userId  // Count only current user's notes
+      }
+    })
+
     const tenant = await prisma.tenant.findUnique({
-      where: { id: user.tenantId },
-      include: { notes: true }
+      where: { id: user.tenantId }
     })
 
     if (!tenant) {
@@ -65,9 +77,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (tenant.subscription === 'free' && tenant.notes.length >= 3) {
+    // Apply per-user limits (3 notes per user on free plan)
+    if (tenant.subscription === 'free' && userNotesCount >= 3) {
       return NextResponse.json(
-        { error: 'Free plan is limited to 3 notes. Upgrade to Pro for unlimited notes.' },
+        { error: 'Free plan is limited to 3 notes per user. Upgrade to Pro for unlimited notes.' },
         { status: 402 }
       )
     }
